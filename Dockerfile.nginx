@@ -1,0 +1,5 @@
+FROM nginx:1.13-alpine
+
+COPY ./src/main/resources/static /usr/share/nginx/html/static
+
+EXPOSE 80

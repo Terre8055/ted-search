@@ -1,0 +1,42 @@
+services:
+  memcached:
+    container_name: memcached
+    image: memcached
+    command: memcached -m 64
+    expose:
+      - "11211"
+    networks:
+      - ted.net
+    volumes:
+      - cached_data:/var/log/memcached
+
+  app:
+    image: 644435390668.dkr.ecr.ap-south-1.amazonaws.com/mike-ted
+    restart: always
+    networks:
+      - ted.net
+      - proxy.net
+    expose:
+      - "9191"
+    depends_on:
+      - memcached
+
+  proxy:
+    container_name: nginx
+    image: 644435390668.dkr.ecr.ap-south-1.amazonaws.com/minney-nginx
+    volumes:
+        - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: always
+    ports:
+      - 8077:80
+    depends_on:
+      - app
+    networks:
+      - proxy.net
+
+networks:
+  proxy.net:
+  ted.net:
+
+volumes:
+  cached_data:

@@ -1,0 +1,83 @@
+pipeline {
+    agent any
+
+    tools {
+        maven 'maven'
+        jdk 'openjdk-8'
+        terraform 'terraform'
+    }
+
+    options {
+        timestamps()
+        timeout(time: 15, unit: 'MINUTES') 
+        gitLabConnection('gitlab')
+    }
+
+    environment {
+        EMAIL = 'appiahmicheal15@gmail.com'
+    }
+
+    triggers {
+            cron('*/15 * * * *')
+    }
+
+
+
+
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    checkout scm
+                }
+            }
+        }
+
+        stage('Terraform Reporting Script') {
+            steps {
+                script {
+                    env.WKSPACE=sh( returnStdout: true, script: "bash active_wkspace.sh").trim()
+                }
+            }
+        }
+
+        stage("Report") {
+            steps {
+                script {
+                    echo "***********Sending reports"
+
+                    def recipients = emailextrecipients([developers()])
+
+                    if (recipients) {
+                        def wk = env.WKSPACE
+                        body = 'The following workspaces are currently running:\n\n' + wk.join('\n')
+                        emailext subject: '$PROJECT_NAME - Build # $BUILD_NUMBER - $BUILD_STATUS',
+                            body: "${body}",
+                            from: 'jenkins',
+                            to: ${EMAIL}
+                    } else {
+                        echo 'All good'
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+
+        always {
+            cleanWs()
+        }
+
+        success {
+            echo 'Build and deploy successful'
+            
+        }
+        failure {
+            echo 'Build and deploy failed'
+            
+        }
+
+    }
+}

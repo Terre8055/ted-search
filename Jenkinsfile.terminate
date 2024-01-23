@@ -1,0 +1,81 @@
+pipeline {
+    agent any
+
+    tools {
+        maven 'maven'
+        jdk 'openjdk-8'
+        terraform 'terraform'
+    }
+
+    options {
+        timestamps()
+        timeout(time: 15, unit: 'MINUTES') 
+        gitLabConnection('gitlab')
+    }
+
+    environment {
+        EMAIL = 'appiahmicheal15@gmail.com'
+    }
+
+    triggers {
+            cron('H/15 * * * *')
+        }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    checkout scm
+                }
+            }
+        }
+
+        stage('Terraform Termination Script') {
+            steps {
+                script {
+                    env.WORKSPACE_INFO = sh(script: './terminate.sh', returnStdout: true).trim()
+                }
+            }
+        }
+
+        stage("Report") {
+            steps {
+                script {
+                    echo "***********Sending reports"
+
+                    def recipients = emailextrecipients([developers()])
+
+                    if (recipients) {
+                        def allWorkspacesStr = sh(script: "echo '${env.WORKSPACE_INFO}' | grep 'All workspace:' | awk -F':' '{print \$2}' | tr -d ' '", returnStdout: true).trim()
+
+                        emailext subject: '$PROJECT_NAME - Build # $BUILD_NUMBER - $BUILD_STATUS',
+                            body: '''$PROJECT_NAME - $BUILD_NUMBER: $BUILD_STATUS
+                                    Here are all deleted workspaces: ${allWorkspacesStr}''',
+                            from: 'jenkins',
+                            to: ${EMAIL}
+                    } else {
+                        echo 'All good'
+                    }
+                }
+            }
+        }
+
+    }
+
+    post {
+
+        always {
+            cleanWs()
+        }
+
+        success {
+            echo 'Build and deploy successful'
+            
+        }
+        failure {
+            echo 'Build and deploy failed'
+            
+        }
+
+    }
+}
